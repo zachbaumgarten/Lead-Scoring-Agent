@@ -1,0 +1,686 @@
+// n8n Code Node: Realistic Lead Data Generator
+// Generates diverse lead quality for testing
+
+function generateRealisticLead() {
+  
+  // Lead quality distribution (weighted random) - More poor leads
+  const leadQuality = getWeightedRandom([
+    { value: 'excellent', weight: 5 },   // 5% excellent leads
+    { value: 'good', weight: 15 },       // 15% good leads  
+    { value: 'average', weight: 25 },    // 25% average leads
+    { value: 'poor', weight: 30 },       // 30% poor leads
+    { value: 'terrible', weight: 25 }    // 25% terrible leads
+  ]);
+
+  const companies = [
+    { name: "Discord", domain: "discord.com", size: "large", industry: "Technology" },
+    { name: "Shopify", domain: "shopify.com", size: "large", industry: "E-commerce" },
+    { name: "Zoom", domain: "zoom.us", size: "large", industry: "Software" },
+    { name: "Slack", domain: "slack.com", size: "large", industry: "Technology" },
+    { name: "Spotify", domain: "spotify.com", size: "large", industry: "Technology" },
+    { name: "Adobe", domain: "adobe.com", size: "large", industry: "Software" },
+    { name: "Atlassian", domain: "atlassian.com", size: "large", industry: "Software" },
+    { name: "Twilio", domain: "twilio.com", size: "medium", industry: "Technology" },
+    { name: "Dropbox", domain: "dropbox.com", size: "large", industry: "Technology" },
+    { name: "GitHub", domain: "github.com", size: "large", industry: "Technology" },
+    { name: "MongoDB", domain: "mongodb.com", size: "medium", industry: "Technology" },
+    { name: "Stripe", domain: "stripe.com", size: "large", industry: "Financial" },
+    { name: "Square", domain: "squareup.com", size: "large", industry: "Financial" },
+    { name: "Coinbase", domain: "coinbase.com", size: "large", industry: "Financial" },
+    { name: "Airbnb", domain: "airbnb.com", size: "large", industry: "Technology" }
+  ];
+
+  const firstNames = ["Emma", "James", "Sarah", "Michael", "Lisa", "David", "Jennifer", "Robert", "Michelle", "Kevin"];
+  const lastNames = ["Brown", "Johnson", "Williams", "Davis", "Miller", "Wilson", "Moore", "Taylor", "Anderson", "Thomas"];
+  
+  const company = companies[Math.floor(Math.random() * companies.length)];
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+
+  // Generate engagement based on lead quality
+  const engagement = generateEngagement(leadQuality);
+  const demographics = generateDemographics(leadQuality, company);
+  const behavior = generateBehavior(leadQuality);
+  const communication = generateCommunication(leadQuality);
+
+  const leadId = `LEAD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const createdDate = getRandomDate(90); // Random date within last 90 days
+  const lastContactDate = getRandomDate(30, createdDate);
+
+  return {
+    lead: {
+      firstName: firstName,
+      lastName: lastName,
+      fullName: `${firstName} ${lastName}`,
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${company.domain}`,
+      phone: generatePhone(),
+      linkedinUrl: `https://linkedin.com/in/${firstName.toLowerCase()}-${lastName.toLowerCase()}`,
+      companyDomain: company.domain,
+      company: company.name,
+      website: `https://${company.domain}`,
+      industry: company.industry,
+      companySize: company.size,
+      location: getRandomLocation(),
+      jobTitle: demographics.jobTitle,
+      department: demographics.department,
+      seniority: demographics.seniority,
+      source: getRandomSource(leadQuality),
+      campaign: getRandomCampaign(),
+      
+      // Engagement metrics based on quality
+      emailOpens: engagement.emailOpens,
+      emailClicks: engagement.emailClicks,
+      websiteVisits: engagement.websiteVisits,
+      pageViews: engagement.pageViews,
+      contentDownloads: engagement.contentDownloads,
+      videoWatches: engagement.videoWatches,
+      demoRequests: engagement.demoRequests,
+      
+      lastEmailOpen: lastContactDate.toISOString(),
+      lastWebsiteVisit: getRandomDate(7, lastContactDate).toISOString(),
+      timeOnSite: engagement.timeOnSite,
+      pagesVisited: behavior.pagesVisited,
+      leadTemperature: behavior.temperature,
+      leadScore: calculateInitialScore(leadQuality, engagement, demographics),
+      grade: 'TBD', // Will be calculated later
+      
+      communicationType: communication.type,
+      preferredContactTime: communication.preferredTime,
+      budgetRange: demographics.budgetRange,
+      timeline: behavior.timeline,
+      decisionMakingRole: demographics.decisionRole,
+      currentSolutions: behavior.currentSolutions,
+      painPoints: behavior.painPoints,
+      
+      createdAt: createdDate.toISOString(),
+      lastUpdated: new Date().toISOString(),
+      lastContact: lastContactDate.toISOString(),
+      nextFollowUp: getNextFollowUp(lastContactDate, leadQuality).toISOString(),
+      notes: generateNotes(leadQuality),
+      assignedTo: getRandomSalesRep(),
+      leadId: leadId,
+      logo: `https://logo.clearbit.com/${company.domain}`,
+      
+      // Add quality indicator for testing
+      _generatedQuality: leadQuality
+    },
+    content: generateEmailContent(leadQuality, firstName, company),
+    contentMetadata: {
+      type: "email",
+      temperature: behavior.temperature,
+      wordCount: Math.floor(Math.random() * 60) + 20,
+      isUnique: true,
+      generatedAt: new Date().toISOString()
+    },
+    // enrichedData will be populated by Clearbit API
+    salesIntelligence: generateSalesIntelligence(leadQuality),
+    // apiEnrichment will be populated by Clearbit node
+  };
+}
+
+// Helper Functions
+
+function getWeightedRandom(items) {
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  for (const item of items) {
+    random -= item.weight;
+    if (random <= 0) return item.value;
+  }
+  return items[items.length - 1].value;
+}
+
+function generateEngagement(quality) {
+  const ranges = {
+    excellent: { opens: [8, 15], clicks: [5, 12], visits: [6, 15], views: [30, 80], downloads: [2, 5], videos: [1, 3], demos: [1, 2], time: [600, 1500] },
+    good: { opens: [4, 8], clicks: [2, 5], visits: [3, 6], views: [15, 35], downloads: [1, 3], videos: [0, 2], demos: [0, 1], time: [300, 800] },
+    average: { opens: [1, 4], clicks: [0, 2], visits: [1, 3], views: [5, 20], downloads: [0, 1], videos: [0, 1], demos: [0, 0], time: [120, 400] },
+    poor: { opens: [0, 1], clicks: [0, 0], visits: [0, 1], views: [1, 5], downloads: [0, 0], videos: [0, 0], demos: [0, 0], time: [30, 120] },
+    terrible: { opens: [0, 0], clicks: [0, 0], visits: [0, 0], views: [0, 2], downloads: [0, 0], videos: [0, 0], demos: [0, 0], time: [5, 30] }
+  };
+  
+  const range = ranges[quality];
+  return {
+    emailOpens: randomBetween(range.opens[0], range.opens[1]),
+    emailClicks: randomBetween(range.clicks[0], range.clicks[1]),
+    websiteVisits: randomBetween(range.visits[0], range.visits[1]),
+    pageViews: randomBetween(range.views[0], range.views[1]),
+    contentDownloads: randomBetween(range.downloads[0], range.downloads[1]),
+    videoWatches: randomBetween(range.videos[0], range.videos[1]),
+    demoRequests: randomBetween(range.demos[0], range.demos[1]),
+    timeOnSite: randomBetween(range.time[0], range.time[1])
+  };
+}
+
+function generateDemographics(quality, company) {
+  const jobTitles = {
+    excellent: ["VP Sales", "Director of Operations", "Chief Technology Officer", "VP Marketing"],
+    good: ["Sales Manager", "Operations Manager", "IT Director", "Marketing Manager"],
+    average: ["Account Manager", "Project Manager", "IT Manager", "Business Analyst"],
+    poor: ["Sales Representative", "Coordinator", "Assistant Manager", "Junior Analyst"],
+    terrible: ["Intern", "Administrative Assistant", "Entry Level Analyst", "Temporary Worker"]
+  };
+  
+  const seniorities = {
+    excellent: ["Executive", "Senior"],
+    good: ["Senior", "Mid-Level"],
+    average: ["Mid-Level"],
+    poor: ["Entry-Level", "Mid-Level"],
+    terrible: ["Entry-Level"]
+  };
+  
+  const budgetRanges = {
+    excellent: ["$100K+", "$50K-$100K"],
+    good: ["$50K-$100K", "$25K-$50K"],
+    average: ["$25K-$50K", "$10K-$25K"],
+    poor: ["$10K-$25K", "$5K-$10K"],
+    terrible: ["Under $5K", "No Budget"]
+  };
+  
+  const decisionRoles = {
+    excellent: ["Decision Maker", "Influencer"],
+    good: ["Influencer", "Evaluator"],
+    average: ["Evaluator"],
+    poor: ["Evaluator", "No Authority"],
+    terrible: ["No Authority"]
+  };
+  
+  return {
+    jobTitle: getRandomFromArray(jobTitles[quality]),
+    department: getRandomFromArray(["Sales", "Marketing", "Operations", "IT", "Customer Success"]),
+    seniority: getRandomFromArray(seniorities[quality]),
+    budgetRange: getRandomFromArray(budgetRanges[quality]),
+    decisionRole: getRandomFromArray(decisionRoles[quality])
+  };
+}
+
+function generateBehavior(quality) {
+  const temperatures = {
+    excellent: ["hot", "warm"],
+    good: ["warm"],
+    average: ["warm", "cold"],
+    poor: ["cold"],
+    terrible: ["cold"]
+  };
+  
+  const timelines = {
+    excellent: ["Immediate (< 1 month)", "Short-term (1-3 months)"],
+    good: ["Short-term (1-3 months)", "Medium-term (3-6 months)"],
+    average: ["Medium-term (3-6 months)", "Long-term (6-12 months)"],
+    poor: ["Long-term (6-12 months)", "No specific timeline"],
+    terrible: ["No specific timeline", "Just researching"]
+  };
+  
+  const pages = {
+    excellent: ["Homepage", "Pricing", "Demo", "Case Studies", "ROI Calculator", "Implementation", "Security"],
+    good: ["Homepage", "Pricing", "Features", "Case Studies", "About Us"],
+    average: ["Homepage", "Features", "About Us", "Contact"],
+    poor: ["Homepage", "About Us"],
+    terrible: ["Homepage"]
+  };
+  
+  const painPoints = {
+    excellent: ["Revenue optimization", "Competitive advantage", "Scalability challenges"],
+    good: ["Process efficiency", "Cost reduction", "Integration issues"],
+    average: ["Manual processes", "Reporting challenges", "Time management"],
+    poor: ["Basic functionality needs", "Budget constraints"],
+    terrible: ["Just exploring options", "No clear pain points"]
+  };
+  
+  return {
+    temperature: getRandomFromArray(temperatures[quality]),
+    timeline: getRandomFromArray(timelines[quality]),
+    pagesVisited: getRandomSubset(pages[quality], Math.min(pages[quality].length, randomBetween(1, 5))),
+    painPoints: getRandomSubset(painPoints[quality], randomBetween(1, 3)),
+    currentSolutions: generateCurrentSolutions(quality)
+  };
+}
+
+function generateCommunication(quality) {
+  const types = {
+    excellent: ["direct_outreach", "referral", "demo_request"],
+    good: ["email", "contact_form", "referral"],
+    average: ["email", "contact_form"],
+    poor: ["cold_email", "web_form"],
+    terrible: ["cold_email", "spam"]
+  };
+  
+  const times = ["Morning (9-11 AM)", "Midday (11 AM-2 PM)", "Afternoon (2-5 PM)", "Any time"];
+  
+  return {
+    type: getRandomFromArray(types[quality]),
+    preferredTime: getRandomFromArray(times)
+  };
+}
+
+function generateEmailContent(quality, firstName, company) {
+  const contents = {
+    excellent: [
+      `Hi there,\n\nWe're expanding rapidly and need a robust solution for our ${company.name} operations. Budget approved for $75K+. Can we schedule a demo this week?\n\nBest regards,\n${firstName}`,
+      `Hello,\n\nOur board approved budget for digital transformation. Looking at solutions in the $100K range. When can we discuss implementation?\n\nThanks,\n${firstName}`
+    ],
+    good: [
+      `Hi,\n\nThanks for reaching out. We're evaluating solutions for Q4 implementation. Budget range is around $40K. Would like to learn more.\n\nBest,\n${firstName}`,
+      `Hello,\n\nInteresting timing. We're looking to solve our integration challenges. Budget discussions are in progress.\n\nRegards,\n${firstName}`
+    ],
+    average: [
+      `Hi,\n\nReceived your information. We might be interested but need to understand costs first. No immediate timeline.\n\nThanks,\n${firstName}`,
+      `Hello,\n\nLooking at various options. Can you send more details about pricing and features?\n\n${firstName}`
+    ],
+    poor: [
+      `Hi,\n\nNot sure this is relevant but curious about your solution. Very limited budget though.\n\n${firstName}`,
+      `Hello,\n\nMaybe interested. Need to check with management about budget. Might take a while.\n\n${firstName}`
+    ],
+    terrible: [
+      `Hey,\n\nGot your email. Not really looking for anything right now but thanks.\n\n${firstName}`,
+      `Hi,\n\nJust browsing. No budget or timeline. Remove me from further emails.\n\n${firstName}`
+    ]
+  };
+  
+  return getRandomFromArray(contents[quality]);
+}
+
+function generateEnrichmentData(company, quality) {
+  const healthRatings = {
+    excellent: ["A+", "A", "A-"],
+    good: ["A-", "B+", "B"],
+    average: ["B", "B-", "C+"],
+    poor: ["C+", "C", "C-"],
+    terrible: ["C-", "D", "F"]
+  };
+  
+  const growthRates = {
+    excellent: ["+75%", "+50%", "+40%"],
+    good: ["+30%", "+25%", "+20%"],
+    average: ["+15%", "+10%", "+5%"],
+    poor: ["+2%", "0%", "-2%"],
+    terrible: ["-5%", "-10%", "-15%"]
+  };
+  
+  return {
+    companyDetails: {
+      foundedYear: 2020 - Math.floor(Math.random() * 20),
+      headquarters: getRandomLocation(),
+      employeeCount: getEmployeeCount(company.size),
+      realCompanyName: company.name,
+      realDomain: company.domain,
+      description: `${company.name} is a ${quality} company in the ${company.industry} industry.`
+    },
+    technologiesUsed: generateTechStack(quality),
+    financialHealth: {
+      creditRating: getRandomFromArray(healthRatings[quality]),
+      growthRate: getRandomFromArray(growthRates[quality]),
+      profitability: getProfitability(quality)
+    },
+    intentSignals: {
+      searchedForSolutions: quality === 'excellent' || quality === 'good',
+      downloadedWhitepapers: quality === 'excellent' ? randomBetween(2, 5) : quality === 'good' ? randomBetween(1, 3) : randomBetween(0, 1),
+      budgetCycle: getBudgetCycle(quality)
+    },
+    riskFactors: {
+      paymentRisk: getPaymentRisk(quality),
+      churnRisk: getChurnRisk(quality)
+    },
+    enrichmentMetadata: {
+      confidenceScore: quality === 'excellent' ? randomBetween(85, 95) : quality === 'good' ? randomBetween(70, 85) : randomBetween(40, 70),
+      lastUpdated: new Date().toISOString(),
+      realDataUsed: Math.random() > 0.2
+    }
+  };
+}
+
+function generateSalesIntelligence(quality) {
+  const approaches = {
+    excellent: ["Executive engagement with ROI focus", "Accelerated sales process"],
+    good: ["Solution-focused consultation", "Educational nurturing with case studies"],
+    average: ["Educational nurturing", "Qualification-focused approach"],
+    poor: ["Long-term nurturing", "Basic qualification"],
+    terrible: ["Disqualification assessment", "Very low-touch nurturing"]
+  };
+  
+  const priorityScores = {
+    excellent: randomBetween(80, 95),
+    good: randomBetween(60, 75),
+    average: randomBetween(35, 55),
+    poor: randomBetween(15, 35),
+    terrible: randomBetween(5, 20)
+  };
+  
+  return {
+    strategy: {
+      recommendedApproach: getRandomFromArray(approaches[quality]),
+      keyTalkingPoints: generateTalkingPoints(quality),
+      nextBestActions: generateNextActions(quality),
+      timelineRecommendation: getTimelineRecommendation(quality)
+    },
+    accountInsights: {
+      buyingCommitteeSize: getBuyingCommitteeSize(quality),
+      championPotential: getChampionPotential(quality),
+      budgetAuthority: getBudgetAuthority(quality)
+    },
+    opportunityValue: generateOpportunityValue(quality),
+    engagement: {
+      bestContactMethod: "email",
+      messageFramework: getMessageFramework(quality)
+    },
+    priorityScore: priorityScores[quality],
+    priorityLevel: getPriorityLevel(priorityScores[quality])
+  };
+}
+
+function calculateInitialScore(quality, engagement, demographics) {
+  const baseScores = {
+    excellent: randomBetween(75, 85),
+    good: randomBetween(55, 70),
+    average: randomBetween(35, 55),
+    poor: randomBetween(15, 35),
+    terrible: randomBetween(5, 20)
+  };
+  
+  let score = baseScores[quality];
+  
+  // Apply engagement factors (can be negative for poor leads)
+  if (quality === 'excellent' || quality === 'good') {
+    score += Math.min(engagement.emailClicks * 2, 10);
+    score += Math.min(engagement.websiteVisits * 3, 15);
+    score += engagement.demoRequests * 10;
+  } else if (quality === 'average') {
+    score += Math.min(engagement.emailClicks * 1, 5);
+    score += Math.min(engagement.websiteVisits * 1, 8);
+  } else {
+    // Poor and terrible leads get penalties, not bonuses
+    score -= (5 - engagement.emailClicks) * 2; // Penalty for low engagement
+    score -= (3 - engagement.websiteVisits) * 2;
+    if (engagement.demoRequests === 0) score -= 8;
+  }
+  
+  // Demographic modifiers
+  if (demographics.seniority === "Executive") score += 10;
+  else if (demographics.seniority === "Entry-Level") score -= 12;
+  
+  if (demographics.decisionRole === "Decision Maker") score += 8;
+  else if (demographics.decisionRole === "No Authority") score -= 15;
+  
+  // Budget penalties for poor leads
+  if (demographics.budgetRange.includes("No Budget") || demographics.budgetRange.includes("Under $5K")) {
+    score -= 20;
+  }
+  
+  // Add more variation
+  const variation = (Math.random() - 0.5) * 20; // ±10 points
+  score += variation;
+  
+  return Math.max(5, Math.min(95, Math.round(score)));
+}
+
+// Utility Functions
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getRandomFromArray(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+function getRandomSubset(array, count) {
+  const shuffled = [...array].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
+function getRandomDate(daysBack, fromDate = new Date()) {
+  const date = new Date(fromDate);
+  date.setDate(date.getDate() - Math.floor(Math.random() * daysBack));
+  return date;
+}
+
+function generatePhone() {
+  return `${randomBetween(100, 999)}-${randomBetween(100, 999)}-${randomBetween(1000, 9999)}`;
+}
+
+function getRandomLocation() {
+  const locations = ["New York, NY", "San Francisco, CA", "Chicago, IL", "Austin, TX", "Seattle, WA", "Boston, MA", "Atlanta, GA", "Denver, CO"];
+  return getRandomFromArray(locations);
+}
+
+function getRandomSource(quality) {
+  const sources = {
+    excellent: ["Referral", "Direct", "Partner"],
+    good: ["Website", "Content Marketing", "Webinar"],
+    average: ["Social Media", "SEO", "Email Campaign"],
+    poor: ["Cold Outreach", "List Purchase"],
+    terrible: ["Spam", "Unknown"]
+  };
+  return getRandomFromArray(sources[quality]);
+}
+
+function getRandomCampaign() {
+  const campaigns = ["Product Launch 2025", "Q4 Growth Drive", "Industry Summit", "Digital Transformation", "Cost Optimization"];
+  return getRandomFromArray(campaigns);
+}
+
+function getRandomSalesRep() {
+  const reps = ["Sarah Johnson", "Mike Chen", "David Kim", "Jessica Rodriguez", "Alex Thompson", "Emily Watson"];
+  return getRandomFromArray(reps);
+}
+
+function generateNotes(quality) {
+  const notes = {
+    excellent: ["Excellent fit - fast-track opportunity", "Strong budget authority", "Urgent timeline - Q4 implementation"],
+    good: ["Good engagement - qualified prospect", "Needs integration with existing CRM", "Budget discussions in progress"],
+    average: ["Standard qualification needed", "Timeline uncertain", "Basic interest expressed"],
+    poor: ["Limited engagement", "Budget concerns", "Long timeline if any"],
+    terrible: ["Poor fit", "No clear need", "Consider disqualification"]
+  };
+  return getRandomFromArray(notes[quality]);
+}
+
+function getNextFollowUp(lastContact, quality) {
+  const days = {
+    excellent: randomBetween(1, 3),
+    good: randomBetween(3, 7),
+    average: randomBetween(7, 14),
+    poor: randomBetween(14, 30),
+    terrible: randomBetween(30, 90)
+  };
+  
+  const followUp = new Date(lastContact);
+  followUp.setDate(followUp.getDate() + days[quality]);
+  return followUp;
+}
+
+// Additional helper functions for enrichment data
+function getEmployeeCount(size) {
+  const ranges = {
+    startup: randomBetween(5, 25),
+    small: randomBetween(25, 100),
+    medium: randomBetween(100, 500),
+    large: randomBetween(500, 5000)
+  };
+  return ranges[size] || randomBetween(50, 200);
+}
+
+function generateTechStack(quality) {
+  const allTech = ["Google Workspace", "Office 365", "Salesforce", "HubSpot", "Slack", "Zoom", "AWS", "Docker", "Kubernetes"];
+  const count = quality === 'excellent' ? randomBetween(6, 9) : quality === 'good' ? randomBetween(4, 6) : randomBetween(2, 4);
+  return getRandomSubset(allTech, count);
+}
+
+function getProfitability(quality) {
+  const options = {
+    excellent: ["Profitable", "Growing"],
+    good: ["Growing", "Break-even"],
+    average: ["Break-even", "Improving"],
+    poor: ["Declining", "Loss"],
+    terrible: ["Loss", "Struggling"]
+  };
+  return getRandomFromArray(options[quality]);
+}
+
+function getBudgetCycle(quality) {
+  const cycles = {
+    excellent: ["Approved", "Review"],
+    good: ["Review", "Planning"],
+    average: ["Planning", "Future"],
+    poor: ["Future", "Unknown"],
+    terrible: ["Unknown", "None"]
+  };
+  return getRandomFromArray(cycles[quality]);
+}
+
+function getPaymentRisk(quality) {
+  const risks = {
+    excellent: ["Low"],
+    good: ["Low", "Medium"],
+    average: ["Medium"],
+    poor: ["Medium", "High"],
+    terrible: ["High"]
+  };
+  return getRandomFromArray(risks[quality]);
+}
+
+function getChurnRisk(quality) {
+  const risks = {
+    excellent: ["Low"],
+    good: ["Low", "Medium"],
+    average: ["Medium"],
+    poor: ["Medium", "High"],
+    terrible: ["High"]
+  };
+  return getRandomFromArray(risks[quality]);
+}
+
+function generateTalkingPoints(quality) {
+  const points = {
+    excellent: ["Enterprise scalability", "Advanced security features", "ROI within 6 months"],
+    good: ["Integration capabilities", "Cost savings potential", "Implementation support"],
+    average: ["Basic features overview", "Pricing options", "Getting started process"],
+    poor: ["Entry-level solutions", "Budget-friendly options", "Basic functionality"],
+    terrible: ["Educational content", "Industry insights", "Long-term planning"]
+  };
+  return getRandomSubset(points[quality], randomBetween(2, 3));
+}
+
+function generateNextActions(quality) {
+  const actions = {
+    excellent: ["Schedule C-level demo", "Prepare custom proposal", "Legal/security review"],
+    good: ["Discovery call", "Technical demo", "Reference calls"],
+    average: ["Qualification call", "Feature walkthrough", "Case study review"],
+    poor: ["Educational webinar", "Basic qualification", "Nurture sequence"],
+    terrible: ["Generic content", "Disqualification assessment", "Archive lead"]
+  };
+  return getRandomSubset(actions[quality], randomBetween(1, 2));
+}
+
+function getTimelineRecommendation(quality) {
+  const timelines = {
+    excellent: { nextContact: "Within 24 hours", expectedCloseTime: "2-4 weeks" },
+    good: { nextContact: "Within 3-5 days", expectedCloseTime: "6-12 weeks" },
+    average: { nextContact: "Within 1-2 weeks", expectedCloseTime: "3-6 months" },
+    poor: { nextContact: "Within 1 month", expectedCloseTime: "6+ months" },
+    terrible: { nextContact: "Quarterly check-in", expectedCloseTime: "12+ months or never" }
+  };
+  return timelines[quality];
+}
+
+function getBuyingCommitteeSize(quality) {
+  const sizes = {
+    excellent: randomBetween(5, 8),
+    good: randomBetween(3, 6),
+    average: randomBetween(2, 4),
+    poor: randomBetween(1, 3),
+    terrible: randomBetween(1, 2)
+  };
+  return sizes[quality];
+}
+
+function getChampionPotential(quality) {
+  const potentials = {
+    excellent: ["High", "Very High"],
+    good: ["Medium", "High"],
+    average: ["Medium"],
+    poor: ["Low", "Medium"],
+    terrible: ["Very Low", "Low"]
+  };
+  return getRandomFromArray(potentials[quality]);
+}
+
+function getBudgetAuthority(quality) {
+  const authorities = {
+    excellent: ["High", "Very High"],
+    good: ["Medium", "High"],
+    average: ["Medium"],
+    poor: ["Low", "Medium"],
+    terrible: ["Very Low", "Low"]
+  };
+  return getRandomFromArray(authorities[quality]);
+}
+
+function generateOpportunityValue(quality) {
+  const values = {
+    excellent: {
+      estimatedDealSize: `$${randomBetween(75, 150)}000`,
+      renewalProbability: `${randomBetween(80, 95)}%`,
+      lifetimeValue: `$${randomBetween(400, 800)}000`
+    },
+    good: {
+      estimatedDealSize: `$${randomBetween(40, 75)}000`,
+      renewalProbability: `${randomBetween(65, 80)}%`,
+      lifetimeValue: `$${randomBetween(200, 400)}000`
+    },
+    average: {
+      estimatedDealSize: `$${randomBetween(15, 40)}000`,
+      renewalProbability: `${randomBetween(50, 65)}%`,
+      lifetimeValue: `$${randomBetween(75, 200)}000`
+    },
+    poor: {
+      estimatedDealSize: `$${randomBetween(5, 15)}000`,
+      renewalProbability: `${randomBetween(30, 50)}%`,
+      lifetimeValue: `$${randomBetween(25, 75)}000`
+    },
+    terrible: {
+      estimatedDealSize: `$${randomBetween(1, 5)}000`,
+      renewalProbability: `${randomBetween(10, 30)}%`,
+      lifetimeValue: `$${randomBetween(5, 25)}000`
+    }
+  };
+  return values[quality];
+}
+
+function getMessageFramework(quality) {
+  const frameworks = {
+    excellent: "Executive value proposition",
+    good: "Solution-focused messaging",
+    average: "Educational content",
+    poor: "Basic qualification",
+    terrible: "Generic nurturing"
+  };
+  return frameworks[quality];
+}
+
+function getPriorityLevel(score) {
+  if (score >= 80) return "P1 - Immediate Action";
+  else if (score >= 65) return "P2 - High Priority";
+  else if (score >= 50) return "P3 - Standard Follow-up";
+  else if (score >= 35) return "P4 - Nurture Campaign";
+  else return "P5 - Low Priority/Disqualify";
+}
+
+function generateCurrentSolutions(quality) {
+  const solutions = {
+    excellent: ["Salesforce", "HubSpot", "Microsoft Dynamics", "Oracle"],
+    good: ["Salesforce", "HubSpot", "Pipedrive"],
+    average: ["Basic CRM", "Spreadsheets", "Email"],
+    poor: ["Spreadsheets", "Email", "Manual processes"],
+    terrible: ["Manual processes", "No system"]
+  };
+  return getRandomSubset(solutions[quality], randomBetween(1, 3));
+}
+
+// Main execution
+const leadData = generateRealisticLead();
+
+console.log(`Generated ${leadData.lead._generatedQuality} quality lead: ${leadData.lead.fullName} from ${leadData.lead.company}`);
+console.log(`Initial Score: ${leadData.lead.leadScore}, Temperature: ${leadData.lead.leadTemperature}`);
+
+return [{ json: leadData }];
