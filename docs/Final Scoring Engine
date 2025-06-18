@@ -1,0 +1,431 @@
+// n8n Code5 Node: Final Scoring Engine with Letter Grade Output
+// Combines all data sources and produces final letter grade
+
+// Get data safely from specific nodes
+let leadData, enrichmentAI, communicationAI, sentimentData;
+
+console.log('Starting final scoring calculation...');
+
+// Get original lead data from Code node
+try {
+  leadData = $('Lead Generator').all()[0].json;
+  console.log(`Lead data loaded: ${leadData.lead.firstName} ${leadData.lead.lastName}`);
+} catch (e) {
+  console.error('Could not load lead data from Code node');
+  return [{ json: { error: 'No lead data available', details: e.message } }];
+}
+
+// Get sentiment data from input (previous node)
+try {
+  sentimentData = $input.all()[0].json;
+  console.log(`Sentiment data loaded: ${sentimentData.sentiment || 'unknown'}`);
+} catch (e) {
+  console.log('No sentiment data found');
+  sentimentData = null;
+}
+
+// Get AI Agent enrichment data
+try {
+  enrichmentAI = $('Company Enrichment AI').all()[0].json;
+  console.log('Enrichment AI data loaded');
+} catch (e) {
+  console.log('No enrichment AI data found');
+  enrichmentAI = null;
+}
+
+// Get AI Agent communication data
+try {
+  communicationAI = $('Communication Analyzer AI').all()[0].json;
+  console.log(`Communication AI data loaded: ${communicationAI.overallScore || 'no score'}`);
+} catch (e) {
+  console.log('No communication AI data found');
+  communicationAI = null;
+}
+
+console.log(`Base lead score: ${leadData.lead.leadScore}`);
+console.log(`Lead quality: ${leadData.lead._generatedQuality}`);
+
+// =============================================================================
+// SCORING HELPER FUNCTIONS
+// =============================================================================
+
+function calculateWeightedScore(weights) {
+  let totalScore = 0;
+  let totalWeight = 0;
+  
+  Object.entries(weights).forEach(([key, data]) => {
+    totalScore += data.score * data.weight;
+    totalWeight += data.weight;
+    console.log(`${key}: ${data.score} (weight: ${data.weight})`);
+  });
+  
+  return Math.round(totalScore / totalWeight);
+}
+
+function calculateEnrichmentScore(enrichmentAI) {
+  if (!enrichmentAI) {
+    console.log('No enrichment data, using fallback score');
+    return 50;
+  }
+  
+  let score = 50;
+  
+  // Financial health scoring
+  if (enrichmentAI.financialHealth?.creditRating) {
+    const rating = enrichmentAI.financialHealth.creditRating;
+    if (rating === 'A+') score += 20;
+    else if (rating === 'A') score += 15;
+    else if (rating.startsWith('A')) score += 12;
+    else if (rating.startsWith('B')) score += 8;
+    else if (rating.startsWith('C')) score -= 5;
+    else score -= 10;
+    
+    console.log(`Credit rating ${rating} adjusted score by ${score - 50}`);
+  }
+  
+  // Growth rate scoring
+  if (enrichmentAI.financialHealth?.growthRate) {
+    const growth = enrichmentAI.financialHealth.growthRate;
+    if (growth.includes('+')) {
+      const rate = parseInt(growth.replace(/[^0-9]/g, ''));
+      if (rate >= 50) score += 15;
+      else if (rate >= 25) score += 10;
+      else if (rate >= 10) score += 5;
+    } else if (growth.includes('-')) {
+      score -= 10;
+    }
+    
+    console.log(`Growth rate ${growth} impact applied`);
+  }
+  
+  // Risk factors
+  if (enrichmentAI.riskFactors?.paymentRisk === 'Low') score += 10;
+  else if (enrichmentAI.riskFactors?.paymentRisk === 'High') score -= 15;
+  
+  if (enrichmentAI.riskFactors?.churnRisk === 'Low') score += 5;
+  else if (enrichmentAI.riskFactors?.churnRisk === 'High') score -= 10;
+  
+  const finalScore = Math.max(0, Math.min(100, score));
+  console.log(`Enrichment score calculated: ${finalScore}`);
+  return finalScore;
+}
+
+function calculateSentimentScore(sentimentData) {
+  if (!sentimentData) {
+    console.log('No sentiment data, using neutral score');
+    return 50;
+  }
+  
+  let score = 50;
+  
+  // Sentiment direction with strength multiplier
+  const strength = sentimentData.strength || 0.5;
+  const confidence = sentimentData.confidence || 0.7;
+  
+  if (sentimentData.sentiment === 'positive') {
+    score += 20 * strength; // Up to +20 for strong positive
+  } else if (sentimentData.sentiment === 'negative') {
+    score -= 20 * strength; // Up to -20 for strong negative
+  }
+  // Neutral sentiment stays at base score
+  
+  // Confidence weighting - reduce impact if AI is uncertain
+  if (confidence < 0.6) {
+    score = score * 0.8;
+  } else if (confidence > 0.9) {
+    score = score * 1.1;
+  }
+  
+  // Emotion bonuses (if available)
+  if (sentimentData.emotions) {
+    if (sentimentData.emotions.includes('excitement')) score += 8;
+    if (sentimentData.emotions.includes('urgency')) score += 6;
+    if (sentimentData.emotions.includes('interest')) score += 4;
+    if (sentimentData.emotions.includes('frustration')) score -= 8;
+  }
+  
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  console.log(`Sentiment score calculated: ${finalScore} (${sentimentData.sentiment}, strength: ${strength}, confidence: ${confidence})`);
+  return finalScore;
+}
+
+function calculateFinalGrade(score) {
+  // Strict grading thresholds for realistic distribution
+  if (score >= 90) return 'A+';
+  else if (score >= 85) return 'A';
+  else if (score >= 80) return 'A-';
+  else if (score >= 75) return 'B+';
+  else if (score >= 70) return 'B';
+  else if (score >= 65) return 'B-';
+  else if (score >= 60) return 'C+';
+  else if (score >= 50) return 'C';
+  else if (score >= 40) return 'C-';
+  else if (score >= 30) return 'D';
+  else return 'F';
+}
+
+function calculatePriorityLevel(score, urgency) {
+  if (score >= 85 && urgency === 'high') return 'P0 - Critical';
+  else if (score >= 80) return 'P1 - Immediate Action';
+  else if (score >= 70) return 'P2 - High Priority';
+  else if (score >= 55) return 'P3 - Standard Follow-up';
+  else if (score >= 40) return 'P4 - Nurture Campaign';
+  else return 'P5 - Low Priority/Disqualify';
+}
+
+function generateRecommendations(score, communicationAI, sentimentData) {
+  const recs = [];
+  
+  if (score >= 85) {
+    recs.push('Schedule executive demo within 24-48 hours');
+    recs.push('Prepare custom ROI analysis and pricing proposal');
+  } else if (score >= 70) {
+    recs.push('Send relevant case studies and schedule discovery call');
+    recs.push('Identify additional stakeholders and decision criteria');
+  } else if (score >= 55) {
+    recs.push('Continue nurturing with educational content');
+    recs.push('Qualify timeline and budget more thoroughly');
+  } else if (score >= 40) {
+    recs.push('Move to long-term nurture campaign');
+    recs.push('Focus on building relationship and trust');
+  } else {
+    recs.push('Consider disqualification or very low-touch nurture');
+    recs.push('Reassess qualification criteria');
+  }
+  
+  // AI-specific recommendations
+  if (communicationAI?.objections?.length > 0) {
+    recs.push(`Address key objections: ${communicationAI.objections.join(', ')}`);
+  }
+  
+  if (communicationAI?.urgency === 'high') {
+    recs.push('Respond within 4 hours due to high urgency signals');
+  }
+  
+  if (sentimentData?.sentiment === 'negative') {
+    recs.push('Address negative sentiment before advancing opportunity');
+  }
+  
+  return recs;
+}
+
+function calculateConfidence(scoringWeights, sentimentData) {
+  const scores = Object.values(scoringWeights).map(w => w.score);
+  const mean = scores.reduce((a, b) => a + b) / scores.length;
+  const variance = scores.reduce((acc, score) => acc + Math.pow(score - mean, 2), 0) / scores.length;
+  const standardDeviation = Math.sqrt(variance);
+  
+  let confidence = 'medium';
+  
+  // High confidence factors
+  const highConfidenceFactors = [
+    standardDeviation < 15, // Scores are consistent
+    sentimentData?.confidence > 0.8,
+    communicationAI?.budgetMentioned === true,
+    communicationAI?.timelineMentioned === true
+  ].filter(Boolean).length;
+  
+  // Low confidence factors  
+  const lowConfidenceFactors = [
+    standardDeviation > 30, // Scores conflict significantly
+    sentimentData?.confidence < 0.5,
+    !communicationAI || !sentimentData // Missing AI data
+  ].filter(Boolean).length;
+  
+  if (highConfidenceFactors >= 3) confidence = 'high';
+  else if (lowConfidenceFactors >= 2) confidence = 'low';
+  
+  return confidence;
+}
+
+// =============================================================================
+// MAIN SCORING CALCULATION
+// =============================================================================
+
+// Define scoring weights
+const scoringWeights = {
+  // Original algorithmic scoring (40% weight)
+  algorithmic: {
+    weight: 0.40,
+    score: leadData.lead.leadScore || 50
+  },
+  
+  // AI communication analysis (30% weight)  
+  aiCommunication: {
+    weight: 0.30,
+    score: communicationAI?.overallScore || 50
+  },
+  
+  // AI enrichment data (15% weight)
+  aiEnrichment: {
+    weight: 0.15,
+    score: calculateEnrichmentScore(enrichmentAI)
+  },
+  
+  // Sentiment analysis (10% weight)
+  sentiment: {
+    weight: 0.10,
+    score: calculateSentimentScore(sentimentData)
+  },
+  
+  // Sales intelligence (5% weight)
+  salesIntel: {
+    weight: 0.05,
+    score: leadData.salesIntelligence?.priorityScore || 50
+  }
+};
+
+// Calculate final combined score
+const combinedScore = calculateWeightedScore(scoringWeights);
+
+// Calculate confidence and other metrics
+const confidence = calculateConfidence(scoringWeights, sentimentData);
+const finalGrade = calculateFinalGrade(combinedScore);
+const priorityLevel = calculatePriorityLevel(combinedScore, communicationAI?.urgency);
+
+// Generate insights
+const insights = [];
+
+if (combinedScore < 30) {
+  insights.push('Very low combined score - strong candidate for disqualification');
+}
+
+if (sentimentData?.sentiment === 'negative' && combinedScore < 50) {
+  insights.push('Negative sentiment with low score - address concerns immediately');
+}
+
+if (communicationAI?.buyingIntent === 'strong' && combinedScore > 70) {
+  insights.push('Strong buying intent with high score - priority prospect');
+}
+
+if (leadData.lead._generatedQuality === 'terrible' && combinedScore > 50) {
+  insights.push('Score higher than expected for terrible quality lead - review data');
+}
+
+// Score variance analysis
+const scores = Object.values(scoringWeights).map(w => w.score);
+const mean = scores.reduce((a, b) => a + b) / scores.length;
+const variance = scores.reduce((acc, score) => acc + Math.pow(score - mean, 2), 0) / scores.length;
+const standardDeviation = Math.sqrt(variance);
+
+let varianceLevel = 'low';
+if (standardDeviation > 25) varianceLevel = 'high';
+else if (standardDeviation > 15) varianceLevel = 'medium';
+
+// =============================================================================
+// FINAL OUTPUT WITH LETTER GRADE
+// =============================================================================
+
+const finalScoring = {
+  // Final Results
+  combinedScore: combinedScore,
+  letterGrade: finalGrade,
+  priorityLevel: priorityLevel,
+  confidence: confidence,
+  
+  // Score breakdown
+  scoreBreakdown: {
+    algorithmic: scoringWeights.algorithmic.score,
+    aiCommunication: scoringWeights.aiCommunication.score,
+    aiEnrichment: scoringWeights.aiEnrichment.score,
+    sentiment: scoringWeights.sentiment.score,
+    salesIntelligence: scoringWeights.salesIntel.score,
+    weights: {
+      algorithmic: scoringWeights.algorithmic.weight,
+      aiCommunication: scoringWeights.aiCommunication.weight,
+      aiEnrichment: scoringWeights.aiEnrichment.weight,
+      sentiment: scoringWeights.sentiment.weight,
+      salesIntelligence: scoringWeights.salesIntel.weight
+    }
+  },
+  
+  // Analysis metadata
+  scoreVariance: {
+    variance: Math.round(variance),
+    standardDeviation: Math.round(standardDeviation),
+    level: varianceLevel
+  },
+  
+  // Key insights
+  insights: insights,
+  
+  // Comparison with original
+  scoreChange: combinedScore - (leadData.lead.leadScore || 50),
+  gradeChange: finalGrade !== (leadData.lead.grade || 'C'),
+  
+  // Recommendations
+  recommendations: generateRecommendations(combinedScore, communicationAI, sentimentData),
+  
+  // AI Analysis Summary
+  aiAnalysisSummary: {
+    communicationScore: communicationAI?.overallScore || 'N/A',
+    sentiment: sentimentData?.sentiment || 'N/A',
+    sentimentConfidence: sentimentData?.confidence || 'N/A',
+    urgency: communicationAI?.urgency || 'N/A',
+    buyingIntent: communicationAI?.buyingIntent || 'N/A'
+  },
+  
+  // Metadata
+  calculatedAt: new Date().toISOString(),
+  methodology: 'Weighted combination of algorithmic, AI communication, AI enrichment, sentiment, and sales intelligence scores',
+  dataQuality: confidence
+};
+
+console.log(`Final Combined Score: ${combinedScore}`);
+console.log(`Letter Grade: ${finalGrade}`);
+console.log(`Priority: ${priorityLevel}`);
+console.log(`Score Change: ${finalScoring.scoreChange > 0 ? '+' : ''}${finalScoring.scoreChange}`);
+console.log(`AI Communication Score: ${communicationAI?.overallScore || 'N/A'}`);
+console.log(`Sentiment: ${sentimentData?.sentiment || 'N/A'}`);
+
+// Return enhanced lead data with final scoring
+const finalOutput = {
+  ...leadData,
+  finalScoring: finalScoring,
+  
+  // Add flat fields for easy Google Sheets access
+  combinedScore: combinedScore,
+  letterGrade: finalGrade,
+  priorityLevel: priorityLevel,
+  scoreChange: finalScoring.scoreChange,
+  sentimentScore: scoringWeights.sentiment.score,
+  aiCommunicationScore: scoringWeights.aiCommunication.score,
+  aiEnrichmentScore: scoringWeights.aiEnrichment.score,
+  confidence: confidence
+};
+
+// Create complete flat structure for Google Sheets
+const googleSheetsOutput = {
+  ...leadData.lead,
+  
+  // Use grade instead of duplicating letterGrade/finalGrade
+  grade: finalGrade,
+  
+  // Flatten arrays to strings
+  painPoints: leadData.lead.painPoints.join(', '),
+  currentSolutions: leadData.lead.currentSolutions.join(', '),
+  
+  // Extract nested sales intelligence fields
+  priorityScore: leadData.salesIntelligence?.priorityScore || 0,
+  estimatedDealSize: leadData.salesIntelligence?.opportunityValue?.estimatedDealSize || '$0',
+  lifetimeValue: leadData.salesIntelligence?.opportunityValue?.lifetimeValue || '$0',
+  championPotential: leadData.salesIntelligence?.accountInsights?.championPotential || 'Unknown',
+  budgetAuthority: leadData.salesIntelligence?.accountInsights?.budgetAuthority || 'Unknown',
+  
+  // AI Analysis fields
+  overallScore: communicationAI?.overallScore || 0,
+  sentiment: sentimentData?.sentiment || 'neutral',
+  urgency: communicationAI?.urgency || 'none',
+  buyingIntent: communicationAI?.buyingIntent || 'none',
+  
+  // Final scoring fields (no duplicates)
+  combinedScore: combinedScore,
+  priorityLevel: priorityLevel,
+  confidence: confidence
+};
+
+// Remove the finalScoring object to avoid conflicts
+console.log('Final Combined Score:', combinedScore);
+console.log('Letter Grade:', finalGrade);
+
+return [{ json: googleSheetsOutput }];
