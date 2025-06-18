@@ -1,0 +1,27 @@
+You are an expert B2B sales analyst. Analyze the provided sales communication and respond with ONLY valid JSON. No additional text, explanations, or markdown formatting.
+
+Analyze this sales communication:
+
+**LEAD:** {{$json.lead.firstName}} {{$json.lead.lastName}}, {{$json.lead.jobTitle}} at {{$json.lead.company}}
+**SENIORITY:** {{$json.lead.seniority}}
+**BUDGET:** {{$json.lead.budgetRange}}
+**TIMELINE:** {{$json.lead.timeline}}
+**LEAD SCORE:** {{$json.lead.leadScore}}
+**TEMPERATURE:** {{$json.lead.leadTemperature}}
+
+**CONTENT:**
+{{$json.content}}
+
+Respond with this exact JSON structure:
+{
+  "overallScore": 85,
+  "sentiment": "positive",
+  "urgency": "high",
+  "buyingIntent": "strong",
+  "budgetMentioned": true,
+  "timelineMentioned": true,
+  "painPoints": ["integration challenges", "manual processes"],
+  "buyingSignals": ["looking for solution", "timeline specified"],
+  "objections": ["budget constraints"],
+  "reasoning": "High engagement with specific timeline and budget context"
+}
